@@ -120,6 +120,8 @@ members = [
     "crates/panel",
     "crates/paths",
     "crates/picker",
+    "crates/pijul",
+    "crates/pijul_ui",
     "crates/prettier",
     "crates/project",
     "crates/project_panel",
@@ -314,6 +316,8 @@ inspector_ui = { path = "crates/inspector_ui" }
 install_cli = { path = "crates/install_cli" }
 jj = { path = "crates/jj" }
 jj_ui = { path = "crates/jj_ui" }
+pijul = { path = "crates/pijul" }
+pijul_ui = { path = "crates/pijul_ui" }
 journal = { path = "crates/journal" }
 language = { path = "crates/language" }
 language_extension = { path = "crates/language_extension" }

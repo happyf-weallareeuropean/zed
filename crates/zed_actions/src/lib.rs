@@ -192,6 +192,18 @@ pub mod jj {
     );
 }
 
+pub mod pijul {
+    use gpui::actions;
+
+    actions!(
+        pijul,
+        [
+            /// Opens the Pijul channel list.
+            ChannelList
+        ]
+    );
+}
+
 pub mod toast {
     use gpui::actions;
 
