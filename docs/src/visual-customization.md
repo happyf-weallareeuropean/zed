@@ -310,6 +310,9 @@ TBD: Centered layout related settings
 
 ```json
   "status_bar": {
+    // Show/hide the status bar.
+    // Defaults to true.
+    "enabled": true,
     // Show/hide a button that displays the active buffer's language.
     // Clicking the button brings up the language selector.
     // Defaults to true.

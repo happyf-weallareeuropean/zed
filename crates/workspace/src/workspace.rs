@@ -107,7 +107,8 @@ use ui::{Window, prelude::*};
 use util::{ResultExt, TryFutureExt, paths::SanitizedPath, serde::default_true};
 use uuid::Uuid;
 pub use workspace_settings::{
-    AutosaveSetting, BottomDockLayout, RestoreOnStartupBehavior, TabBarSettings, WorkspaceSettings,
+    AutosaveSetting, BottomDockLayout, RestoreOnStartupBehavior, StatusBarSettings, TabBarSettings,
+    WorkspaceSettings,
 };
 use zed_actions::{Spawn, feedback::FileBugReport};
 
@@ -514,6 +515,7 @@ pub fn init_settings(cx: &mut App) {
     ItemSettings::register(cx);
     PreviewTabsSettings::register(cx);
     TabBarSettings::register(cx);
+    StatusBarSettings::register(cx);
 }
 
 fn prompt_and_open_paths(app_state: Arc<AppState>, options: PathPromptOptions, cx: &mut App) {
