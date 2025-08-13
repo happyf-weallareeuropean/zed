@@ -1287,6 +1287,22 @@ Each option controls displaying of a particular toolbar element. If all elements
 },
 ```
 
+## Title Bar
+
+- Description: Control the visibility of the title bar and its contents.
+- Setting: `title_bar`
+- Default:
+
+```json
+"title_bar": {
+  "enabled": true
+},
+```
+
+**Options**
+
+- `enabled` (`boolean`): When set to `false`, the title bar is not rendered.
+
 ## LSP
 
 - Description: Configuration for language servers.
