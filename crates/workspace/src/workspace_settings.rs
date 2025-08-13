@@ -205,6 +205,19 @@ pub struct WorkspaceSettingsContent {
 }
 
 #[derive(Deserialize)]
+pub struct StatusBarSettings {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, JsonSchema)]
+pub struct StatusBarSettingsContent {
+    /// Whether or not to show the status bar.
+    ///
+    /// Default: true
+    pub enabled: Option<bool>,
+}
+
+#[derive(Deserialize)]
 pub struct TabBarSettings {
     pub show: bool,
     pub show_nav_history_buttons: bool,
@@ -360,6 +373,18 @@ impl Settings for WorkspaceSettings {
         // there doesn't seem to be a way to read whether the bottom dock's "justified"
         // setting is enabled in vscode. that'd be our equivalent to "bottom_dock_layout"
     }
+}
+
+impl Settings for StatusBarSettings {
+    const KEY: Option<&'static str> = Some("status_bar");
+
+    type FileContent = StatusBarSettingsContent;
+
+    fn load(sources: SettingsSources<Self::FileContent>, _: &mut App) -> Result<Self> {
+        sources.json_merge()
+    }
+
+    fn import_from_vscode(_vscode: &settings::VsCodeSettings, _current: &mut Self::FileContent) {}
 }
 
 impl Settings for TabBarSettings {

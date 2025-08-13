@@ -1283,9 +1283,15 @@ Each option controls displaying of a particular toolbar element. If all elements
 
 ```json
 "status_bar": {
+  "enabled": true,
   "active_language_button": true,
 },
 ```
+
+**Options**
+
+- `enabled` — Whether to show the status bar. Default: `true`
+- `active_language_button` — Whether to show the active language button in the status bar. Default: `true`
 
 ## LSP
 
