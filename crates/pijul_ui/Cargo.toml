@@ -1,0 +1,23 @@
+[package]
+name = "pijul_ui"
+version = "0.1.0"
+publish.workspace = true
+edition.workspace = true
+license = "GPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/pijul_ui.rs"
+
+[dependencies]
+fuzzy.workspace = true
+gpui.workspace = true
+pijul.workspace = true
+picker.workspace = true
+ui.workspace = true
+util.workspace = true
+workspace-hack.workspace = true
+workspace.workspace = true
+zed_actions.workspace = true
