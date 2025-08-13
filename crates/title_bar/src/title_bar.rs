@@ -138,6 +138,11 @@ impl Render for TitleBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let title_bar_settings = *TitleBarSettings::get_global(cx);
 
+        if !title_bar_settings.enabled {
+            self.platform_titlebar.update(cx, |this, _| this.set_children(Vec::new()));
+            return self.platform_titlebar.clone().into_any_element();
+        }
+
         let show_menus = show_menus(cx);
 
         let mut children = Vec::new();
