@@ -32,6 +32,7 @@ use util::ResultExt;
 pub struct UserMessage {
     pub id: Option<UserMessageId>,
     pub content: ContentBlock,
+    pub chunks: Vec<acp::ContentBlock>,
     pub checkpoint: Option<GitStoreCheckpoint>,
 }
 
@@ -399,7 +400,7 @@ impl ContentBlock {
             }
         }
 
-        let new_content = self.extract_content_from_block(block);
+        let new_content = self.block_string_contents(block);
 
         match self {
             ContentBlock::Empty => {
@@ -409,19 +410,11 @@ impl ContentBlock {
                 markdown.update(cx, |markdown, cx| markdown.append(&new_content, cx));
             }
             ContentBlock::ResourceLink { resource_link } => {
-                let existing_content = Self::resource_link_to_content(&resource_link.uri);
+                let existing_content = Self::resource_link_md(&resource_link.uri);
                 let combined = format!("{}\n{}", existing_content, new_content);
 
                 *self = Self::create_markdown_block(combined, language_registry, cx);
             }
-        }
-    }
-
-    fn resource_link_to_content(uri: &str) -> String {
-        if let Some(uri) = MentionUri::parse(&uri).log_err() {
-            uri.to_link()
-        } else {
-            uri.to_string().clone()
         }
     }
 
@@ -436,11 +429,11 @@ impl ContentBlock {
         }
     }
 
-    fn extract_content_from_block(&self, block: acp::ContentBlock) -> String {
+    fn block_string_contents(&self, block: acp::ContentBlock) -> String {
         match block {
             acp::ContentBlock::Text(text_content) => text_content.text.clone(),
             acp::ContentBlock::ResourceLink(resource_link) => {
-                Self::resource_link_to_content(&resource_link.uri)
+                Self::resource_link_md(&resource_link.uri)
             }
             acp::ContentBlock::Resource(acp::EmbeddedResource {
                 resource:
@@ -449,11 +442,22 @@ impl ContentBlock {
                         ..
                     }),
                 ..
-            }) => Self::resource_link_to_content(&uri),
-            acp::ContentBlock::Image(_)
-            | acp::ContentBlock::Audio(_)
-            | acp::ContentBlock::Resource(_) => String::new(),
+            }) => Self::resource_link_md(&uri),
+            acp::ContentBlock::Image(image) => Self::image_md(&image),
+            acp::ContentBlock::Audio(_) | acp::ContentBlock::Resource(_) => String::new(),
         }
+    }
+
+    fn resource_link_md(uri: &str) -> String {
+        if let Some(uri) = MentionUri::parse(&uri).log_err() {
+            uri.as_link().to_string()
+        } else {
+            uri.to_string()
+        }
+    }
+
+    fn image_md(_image: &acp::ImageContent) -> String {
+        "`Image`".into()
     }
 
     fn to_markdown<'a>(&'a self, cx: &'a App) -> &'a str {
@@ -804,18 +808,25 @@ impl AcpThread {
         let entries_len = self.entries.len();
 
         if let Some(last_entry) = self.entries.last_mut()
-            && let AgentThreadEntry::UserMessage(UserMessage { id, content, .. }) = last_entry
+            && let AgentThreadEntry::UserMessage(UserMessage {
+                id,
+                content,
+                chunks,
+                ..
+            }) = last_entry
         {
             *id = message_id.or(id.take());
-            content.append(chunk, &language_registry, cx);
+            content.append(chunk.clone(), &language_registry, cx);
+            chunks.push(chunk);
             let idx = entries_len - 1;
             cx.emit(AcpThreadEvent::EntryUpdated(idx));
         } else {
-            let content = ContentBlock::new(chunk, &language_registry, cx);
+            let content = ContentBlock::new(chunk.clone(), &language_registry, cx);
             self.push_entry(
                 AgentThreadEntry::UserMessage(UserMessage {
                     id: message_id,
                     content,
+                    chunks: vec![chunk],
                     checkpoint: None,
                 }),
                 cx,
@@ -1150,6 +1161,7 @@ impl AcpThread {
             AgentThreadEntry::UserMessage(UserMessage {
                 id: message_id.clone(),
                 content: block,
+                chunks: message.clone(),
                 checkpoint: None,
             }),
             cx,
@@ -1566,11 +1578,7 @@ mod tests {
         let project = Project::test(fs, [], cx).await;
         let connection = Rc::new(FakeAgentConnection::new());
         let thread = cx
-            .spawn(async move |mut cx| {
-                connection
-                    .new_thread(project, Path::new(path!("/test")), &mut cx)
-                    .await
-            })
+            .update(|cx| connection.new_thread(project, Path::new(path!("/test")), cx))
             .await
             .unwrap();
 
@@ -1690,11 +1698,7 @@ mod tests {
         ));
 
         let thread = cx
-            .spawn(async move |mut cx| {
-                connection
-                    .new_thread(project, Path::new(path!("/test")), &mut cx)
-                    .await
-            })
+            .update(|cx| connection.new_thread(project, Path::new(path!("/test")), cx))
             .await
             .unwrap();
 
@@ -1777,7 +1781,7 @@ mod tests {
             .unwrap();
 
         let thread = cx
-            .spawn(|mut cx| connection.new_thread(project, Path::new(path!("/tmp")), &mut cx))
+            .update(|cx| connection.new_thread(project, Path::new(path!("/tmp")), cx))
             .await
             .unwrap();
 
@@ -1840,11 +1844,7 @@ mod tests {
         }));
 
         let thread = cx
-            .spawn(async move |mut cx| {
-                connection
-                    .new_thread(project, Path::new(path!("/test")), &mut cx)
-                    .await
-            })
+            .update(|cx| connection.new_thread(project, Path::new(path!("/test")), cx))
             .await
             .unwrap();
 
@@ -1952,10 +1952,11 @@ mod tests {
             }
         }));
 
-        let thread = connection
-            .new_thread(project, Path::new(path!("/test")), &mut cx.to_async())
+        let thread = cx
+            .update(|cx| connection.new_thread(project, Path::new(path!("/test")), cx))
             .await
             .unwrap();
+
         cx.update(|cx| thread.update(cx, |thread, cx| thread.send(vec!["Hi".into()], cx)))
             .await
             .unwrap();
@@ -2012,8 +2013,8 @@ mod tests {
                 .boxed_local()
             }
         }));
-        let thread = connection
-            .new_thread(project, Path::new(path!("/test")), &mut cx.to_async())
+        let thread = cx
+            .update(|cx| connection.new_thread(project, Path::new(path!("/test")), cx))
             .await
             .unwrap();
 
@@ -2218,7 +2219,7 @@ mod tests {
             self: Rc<Self>,
             project: Entity<Project>,
             _cwd: &Path,
-            cx: &mut gpui::AsyncApp,
+            cx: &mut gpui::App,
         ) -> Task<gpui::Result<Entity<AcpThread>>> {
             let session_id = acp::SessionId(
                 rand::thread_rng()
@@ -2228,9 +2229,8 @@ mod tests {
                     .collect::<String>()
                     .into(),
             );
-            let thread = cx
-                .new(|cx| AcpThread::new("Test", self.clone(), project, session_id.clone(), cx))
-                .unwrap();
+            let thread =
+                cx.new(|cx| AcpThread::new("Test", self.clone(), project, session_id.clone(), cx));
             self.sessions.lock().insert(session_id, thread.downgrade());
             Task::ready(Ok(thread))
         }
