@@ -1372,15 +1372,20 @@ impl CompletionsMenu {
         window: &mut Window,
         cx: &mut Context<Editor>,
     ) {
-        let mut offset = self.scroll_handle_aside.offset();
+        let previous_offset = self.scroll_handle_aside.offset();
+        let mut next_offset = previous_offset;
 
-        offset.y -= amount.pixels(
+        next_offset.y -= amount.pixels(
             window.line_height(),
             self.scroll_handle_aside.bounds().size.height - px(16.),
         ) / 2.0;
 
+        if next_offset == previous_offset {
+            return;
+        }
+
+        self.scroll_handle_aside.set_offset(next_offset);
         cx.notify();
-        self.scroll_handle_aside.set_offset(offset);
     }
 }
 
