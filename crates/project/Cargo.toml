@@ -19,7 +19,6 @@ required-features = ["test-support"]
 path = "tests/integration/project_tests.rs"
 
 [features]
-runtime_shaders = ["gpui/runtime_shaders"]
 test-support = [
     "buffer_diff/test-support",
     "client/test-support",

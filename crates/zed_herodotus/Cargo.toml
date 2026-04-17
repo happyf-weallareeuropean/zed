@@ -8,9 +8,6 @@ license = "GPL-3.0-or-later"
 [lints]
 workspace = true
 
-[features]
-runtime_shaders = ["gpui/runtime_shaders"]
-
 [[bin]]
 name = "zed-herodotus"
 path = "src/main.rs"

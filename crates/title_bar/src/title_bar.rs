@@ -158,9 +158,8 @@ fn sync_titlebar_item(workspace: &mut Workspace, window: &mut Window, cx: &mut C
     ) {
         (true, None) => {
             let multi_workspace = workspace.multi_workspace().cloned();
-            let item = cx.new(|cx| {
-                TitleBar::new("title-bar", workspace, multi_workspace, window, cx)
-            });
+            let item =
+                cx.new(|cx| TitleBar::new("title-bar", workspace, multi_workspace, window, cx));
             workspace.set_titlebar_item(Some(item.into()), window, cx);
         }
         (false, Some(_)) => workspace.set_titlebar_item(None, window, cx),

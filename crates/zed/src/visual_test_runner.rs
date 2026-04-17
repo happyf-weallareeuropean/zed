@@ -1197,7 +1197,8 @@ fn run_local_history_panel_visual_tests(
         })
         .context("Failed to resolve local history workspace context")?;
 
-    let rel_path: Arc<util::rel_path::RelPath> = util::rel_path::rel_path("src/history_demo.rs").into();
+    let rel_path: Arc<util::rel_path::RelPath> =
+        util::rel_path::rel_path("src/history_demo.rs").into();
     let local_history_project_path: project::ProjectPath = (worktree_id, rel_path).into();
 
     let open_file_task = workspace_window

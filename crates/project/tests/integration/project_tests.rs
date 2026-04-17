@@ -83,8 +83,8 @@ use std::{
 };
 use sum_tree::SumTree;
 use task::{ResolvedTask, ShellKind, TaskContext};
-use text::{Anchor, PointUtf16, ReplicaId, ToOffset, Unclipped};
 use tempfile::tempdir;
+use text::{Anchor, PointUtf16, ReplicaId, ToOffset, Unclipped};
 use unindent::Unindent as _;
 use util::{
     TryFutureExt as _, assert_set_eq, maybe, path,
