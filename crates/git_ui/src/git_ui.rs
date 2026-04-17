@@ -1,3 +1,5 @@
+#![feature(round_char_boundary)]
+
 use anyhow::anyhow;
 use commit_modal::CommitModal;
 use editor::{Editor, actions::DiffClipboardWithSelectionData};

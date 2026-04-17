@@ -208,6 +208,7 @@ pub enum WorktreeStoreEvent {
     WorktreeUpdatedGitRepositories(WorktreeId, UpdatedGitRepositoriesSet),
     WorktreeDeletedEntry(WorktreeId, ProjectEntryId),
     WorktreeUpdatedRootRepoCommonDir(WorktreeId),
+    WorktreeRootPathChanged(WorktreeId, PathBuf, PathBuf),
 }
 
 impl EventEmitter<WorktreeStoreEvent> for WorktreeStore {}
@@ -933,6 +934,13 @@ impl WorktreeStore {
                 worktree::Event::UpdatedRootRepoCommonDir { .. } => {
                     cx.emit(WorktreeStoreEvent::WorktreeUpdatedRootRepoCommonDir(
                         worktree_id,
+                    ));
+                }
+                worktree::Event::RootPathChanged { old_path, new_path } => {
+                    cx.emit(WorktreeStoreEvent::WorktreeRootPathChanged(
+                        worktree_id,
+                        old_path.as_path().to_path_buf(),
+                        new_path.as_path().to_path_buf(),
                     ));
                 }
             }

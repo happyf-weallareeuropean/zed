@@ -38,6 +38,7 @@
   - [Command Palette](./command-palette.md)
   - [Outline Panel](./outline-panel.md)
   - [Tab Switcher](./tab-switcher.md)
+- [Local History](./local-history.md)
 - [Running & Testing](./running-testing.md)
   - [Terminal](./terminal.md)
   - [Tasks](./tasks.md)

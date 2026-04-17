@@ -141,6 +141,9 @@ pub struct SettingsContent {
     /// Configuration for Git-related features
     pub git: Option<GitSettings>,
 
+    /// Configuration for Local History.
+    pub local_history: Option<LocalHistorySettingsContent>,
+
     /// Common language server settings.
     pub global_lsp_settings: Option<GlobalLspSettingsContent>,
 
@@ -165,6 +168,8 @@ pub struct SettingsContent {
     pub line_indicator_format: Option<LineIndicatorFormat>,
 
     pub language_models: Option<AllLanguageModelSettingsContent>,
+
+    pub local_history_panel: Option<LocalHistoryPanelSettingsContent>,
 
     pub outline_panel: Option<OutlinePanelSettingsContent>,
 
@@ -354,6 +359,46 @@ impl strum::VariantNames for BaseKeymapContent {
     ];
 }
 
+#[with_fallible_options]
+#[derive(Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug)]
+pub struct TitleBarSettingsContent {
+    /// Whether to show the title bar.
+    ///
+    /// Default: true
+    pub visible: Option<bool>,
+    /// Whether to show the branch icon beside branch switcher in the title bar.
+    ///
+    /// Default: false
+    pub show_branch_icon: Option<bool>,
+    /// Whether to show onboarding banners in the title bar.
+    ///
+    /// Default: true
+    pub show_onboarding_banner: Option<bool>,
+    /// Whether to show user avatar in the title bar.
+    ///
+    /// Default: true
+    pub show_user_picture: Option<bool>,
+    /// Whether to show the branch name button in the titlebar.
+    ///
+    /// Default: true
+    pub show_branch_name: Option<bool>,
+    /// Whether to show the project host and name in the titlebar.
+    ///
+    /// Default: true
+    pub show_project_items: Option<bool>,
+    /// Whether to show the sign in button in the title bar.
+    ///
+    /// Default: true
+    pub show_sign_in: Option<bool>,
+    /// Whether to show the user menu button in the title bar.
+    ///
+    /// Default: true
+    pub show_user_menu: Option<bool>,
+    /// Whether to show the menus in the title bar.
+    ///
+    /// Default: false
+    pub show_menus: Option<bool>,
+}
 /// Configuration of audio in Zed.
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug)]
@@ -602,6 +647,104 @@ pub struct GitPanelSettingsContent {
 }
 
 #[derive(
+    Default, Copy, Clone, Debug, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq, Eq,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalHistoryPrunePolicy {
+    /// Prune only when size is over the cap and entries are older than the age threshold.
+    #[default]
+    Both,
+    /// Prune based on size only.
+    SizeOnly,
+    /// Prune based on age only.
+    AgeOnly,
+    /// Prune based on either size or age.
+    Any,
+}
+
+#[with_fallible_options]
+#[derive(Clone, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, PartialEq)]
+pub struct LocalHistorySettingsContent {
+    /// Whether local history is enabled.
+    ///
+    /// Default: true
+    pub enabled: Option<bool>,
+
+    /// Whether to capture local history on save (including autosave).
+    ///
+    /// Default: false
+    pub capture_on_save: Option<bool>,
+
+    /// Capture local history after edits are idle or file changes settle for the given
+    /// number of milliseconds. Set to 0 to disable.
+    ///
+    /// Default: 1000
+    pub capture_on_edit_idle_ms: Option<DelayMs>,
+
+    /// Capture local history when switching focus between items.
+    ///
+    /// Default: true
+    pub capture_on_focus_change: Option<bool>,
+
+    /// Capture local history when the window is deactivated.
+    ///
+    /// Default: true
+    pub capture_on_window_change: Option<bool>,
+
+    /// Capture local history before running tasks.
+    ///
+    /// Default: true
+    pub capture_on_task: Option<bool>,
+
+    /// Capture local history when a file changes on disk.
+    ///
+    /// Default: true
+    pub capture_on_external_change: Option<bool>,
+
+    /// Storage endpoints (directories) to read from. If null or empty,
+    /// Zed uses its default data directory.
+    ///
+    /// Default: null
+    pub storage_paths: Option<Vec<String>>,
+
+    /// The active storage endpoint for new snapshots. If unset, the first
+    /// storage path is used.
+    ///
+    /// Default: null
+    pub active_storage_path: Option<String>,
+
+    /// Minimum age in days before entries are eligible for pruning.
+    ///
+    /// Default: 100
+    pub min_age_days: Option<u64>,
+
+    /// Percentage of available free space to use as the per-worktree cap
+    /// in the active endpoint.
+    ///
+    /// Default: 0.12
+    #[serde(serialize_with = "crate::serialize_optional_f32_with_two_decimal_places")]
+    pub cap_free_space_percent: Option<f32>,
+
+    /// Minimum cap size in bytes.
+    ///
+    /// Default: 314572800 (300 MiB)
+    pub cap_min_bytes: Option<u64>,
+
+    /// Pruning policy for local history.
+    ///
+    /// Default: both
+    pub prune_policy: Option<LocalHistoryPrunePolicy>,
+
+    /// Globs for files/directories excluded from local history.
+    ///
+    /// Default: ["**/.git/**", "**/.hg/**", "**/.svn/**", "**/.jj/**",
+    ///           "**/node_modules/**", "**/target/**", "**/dist/**", "**/build/**",
+    ///           "**/out/**", "**/.gradle/**", "**/.idea/**", "**/.zed/**",
+    ///           "**/*.min.*", "**/*.map"]
+    pub exclude_globs: Option<Vec<String>>,
+}
+
+#[derive(
     Default,
     Copy,
     Clone,
@@ -646,6 +789,70 @@ pub struct PanelSettingsContent {
     /// Default: 240
     #[serde(serialize_with = "crate::serialize_optional_f32_with_two_decimal_places")]
     pub default_width: Option<f32>,
+}
+
+/// Controls when to show header metadata in the local history panel.
+///
+/// Default: auto
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    MergeFrom,
+    PartialEq,
+    Eq,
+    strum::VariantArray,
+    strum::VariantNames,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalHistoryPanelHeaderVisibility {
+    /// Show metadata only when holding shift near the panel header.
+    #[default]
+    Auto,
+    /// Always show header metadata.
+    Always,
+    /// Never show header metadata.
+    Never,
+}
+
+#[with_fallible_options]
+#[derive(Clone, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, PartialEq)]
+pub struct LocalHistoryPanelSettingsContent {
+    /// Whether to show the panel button in the status bar.
+    ///
+    /// Default: true
+    pub button: Option<bool>,
+    /// Where to dock the panel.
+    ///
+    /// Default: right
+    pub dock: Option<DockPosition>,
+    /// Default width of the panel in pixels.
+    ///
+    /// Default: 300
+    #[serde(serialize_with = "crate::serialize_optional_f32_with_two_decimal_places")]
+    pub default_width: Option<f32>,
+    /// Whether to show the relative file path line in local history entries.
+    ///
+    /// Default: false
+    pub show_relative_path: Option<bool>,
+    /// Minimum vertical gap between timeline entries in pixels.
+    ///
+    /// Default: 0
+    #[serde(serialize_with = "crate::serialize_optional_f32_with_two_decimal_places")]
+    pub timeline_gap_min_px: Option<f32>,
+    /// Maximum vertical gap between timeline entries in pixels.
+    ///
+    /// Default: 12
+    #[serde(serialize_with = "crate::serialize_optional_f32_with_two_decimal_places")]
+    pub timeline_gap_max_px: Option<f32>,
+    /// Controls when to show the timeline and storage metadata header.
+    ///
+    /// Default: auto
+    pub header_metadata_visibility: Option<LocalHistoryPanelHeaderVisibility>,
 }
 
 #[with_fallible_options]

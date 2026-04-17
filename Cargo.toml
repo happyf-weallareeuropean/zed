@@ -227,6 +227,7 @@ members = [
     "crates/zed_actions",
     "crates/zed_credentials_provider",
     "crates/zed_env_vars",
+    "crates/zed_herodotus",
     "crates/zeta_prompt",
     "crates/zlog",
     "crates/zlog_settings",
@@ -376,6 +377,7 @@ language_selector = { path = "crates/language_selector" }
 language_tools = { path = "crates/language_tools" }
 languages = { path = "crates/languages" }
 line_ending_selector = { path = "crates/line_ending_selector" }
+local_history_ui = { path = "crates/local_history_ui" }
 livekit_api = { path = "crates/livekit_api" }
 livekit_client = { path = "crates/livekit_client" }
 lmstudio = { path = "crates/lmstudio" }
@@ -482,6 +484,7 @@ zed = { path = "crates/zed" }
 zed_actions = { path = "crates/zed_actions" }
 zed_credentials_provider = { path = "crates/zed_credentials_provider" }
 zed_env_vars = { path = "crates/zed_env_vars" }
+zed_herodotus = { path = "crates/zed_herodotus" }
 edit_prediction = { path = "crates/edit_prediction" }
 edit_prediction_metrics = { path = "crates/edit_prediction_metrics" }
 zeta_prompt = { path = "crates/zeta_prompt" }
@@ -576,6 +579,7 @@ env_logger = "0.11"
 encoding_rs = "0.8"
 exec = "0.3.1"
 fancy-regex = "0.17.0"
+fs2 = "0.4.3"
 fork = "0.4.0"
 futures = "0.3.32"
 futures-concurrency = "7.7.1"

@@ -32,8 +32,7 @@ use gpui::{
 use onboarding_banner::OnboardingBanner;
 use project::{Project, git_store::GitStoreEvent, trusted_worktrees::TrustedWorktrees};
 use remote::RemoteConnectionOptions;
-use settings::Settings;
-
+use settings::{Settings, SettingsStore};
 use std::sync::Arc;
 use std::time::Duration;
 use theme::ActiveTheme;
@@ -77,9 +76,20 @@ pub fn init(cx: &mut App) {
         let Some(window) = window else {
             return;
         };
-        let multi_workspace = workspace.multi_workspace().cloned();
-        let item = cx.new(|cx| TitleBar::new("title-bar", workspace, multi_workspace, window, cx));
-        workspace.set_titlebar_item(item.into(), window, cx);
+
+        let mut was_visible = TitleBarSettings::get_global(cx).visible;
+        sync_titlebar_item(workspace, window, cx);
+
+        cx.observe_global_in::<SettingsStore>(window, move |workspace, window, cx| {
+            let visible = TitleBarSettings::get_global(cx).visible;
+            if visible == was_visible {
+                return;
+            }
+
+            was_visible = visible;
+            sync_titlebar_item(workspace, window, cx);
+        })
+        .detach();
 
         workspace.register_action(|workspace, _: &SimulateUpdateAvailable, _window, cx| {
             if let Some(titlebar) = workspace
@@ -139,6 +149,23 @@ pub fn init(cx: &mut App) {
         });
     })
     .detach();
+}
+
+fn sync_titlebar_item(workspace: &mut Workspace, window: &mut Window, cx: &mut Context<Workspace>) {
+    match (
+        TitleBarSettings::get_global(cx).visible,
+        workspace.titlebar_item(),
+    ) {
+        (true, None) => {
+            let multi_workspace = workspace.multi_workspace().cloned();
+            let item = cx.new(|cx| {
+                TitleBar::new("title-bar", workspace, multi_workspace, window, cx)
+            });
+            workspace.set_titlebar_item(Some(item.into()), window, cx);
+        }
+        (false, Some(_)) => workspace.set_titlebar_item(None, window, cx),
+        _ => {}
+    }
 }
 
 pub struct TitleBar {

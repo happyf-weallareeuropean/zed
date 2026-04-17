@@ -192,7 +192,13 @@ fn init_logging_server(log_file_path: &Path) -> Result<Receiver<Vec<u8>>> {
     let old_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let backtrace = std::backtrace::Backtrace::force_capture();
-        let message = info.payload_as_str().unwrap_or("Box<Any>").to_owned();
+        let message = match info.payload().downcast_ref::<&'static str>() {
+            Some(message) => (*message).to_owned(),
+            None => match info.payload().downcast_ref::<String>() {
+                Some(message) => message.clone(),
+                None => "Box<Any>".to_owned(),
+            },
+        };
         let location = info
             .location()
             .map_or_else(|| "<unknown>".to_owned(), |location| location.to_string());

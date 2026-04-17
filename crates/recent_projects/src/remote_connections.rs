@@ -324,6 +324,8 @@ pub async fn open_remote_project(
                                 RemoteConnectionOptions::Mock(_) => {
                                     "Failed to connect to mock server"
                                 }
+                                #[cfg(not(any(test, feature = "test-support")))]
+                                _ => "Failed to connect to remote server",
                             },
                             Some(&format!("{e:#}")),
                             &["Retry", "Cancel"],
@@ -385,6 +387,8 @@ pub async fn open_remote_project(
                                 RemoteConnectionOptions::Mock(_) => {
                                     "Failed to connect to mock server"
                                 }
+                                #[cfg(not(any(test, feature = "test-support")))]
+                                _ => "Failed to connect to remote server",
                             },
                             Some(&format!("{e:#}")),
                             &["Retry", "Cancel"],

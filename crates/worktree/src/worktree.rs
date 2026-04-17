@@ -377,6 +377,10 @@ pub enum Event {
     DeletedEntry(ProjectEntryId),
     /// The worktree root itself has been deleted (for single-file worktrees)
     Deleted,
+    RootPathChanged {
+        old_path: Arc<SanitizedPath>,
+        new_path: Arc<SanitizedPath>,
+    },
 }
 
 impl EventEmitter<Event> for Worktree {}
@@ -2030,8 +2034,9 @@ impl LocalWorktree {
     pub fn update_abs_path_and_refresh(
         &mut self,
         new_path: Arc<SanitizedPath>,
-        cx: &Context<Worktree>,
+        cx: &mut Context<Worktree>,
     ) {
+        let old_path = self.snapshot.abs_path.clone();
         self.snapshot.git_repositories = Default::default();
         self.snapshot.ignores_by_parent_abs_path = Default::default();
         let root_name = new_path
@@ -2042,6 +2047,12 @@ impl LocalWorktree {
                 RelPath::unix(f).unwrap().into()
             });
         self.snapshot.update_abs_path(new_path, root_name);
+        if old_path != self.snapshot.abs_path {
+            cx.emit(Event::RootPathChanged {
+                old_path,
+                new_path: self.snapshot.abs_path.clone(),
+            });
+        }
         self.restart_background_scanners(cx);
     }
     #[cfg(feature = "test-support")]

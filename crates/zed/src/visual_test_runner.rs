@@ -107,6 +107,7 @@ use {
         WindowBounds, WindowHandle, WindowOptions, point, px, size,
     },
     image::RgbaImage,
+    local_history_ui::LocalHistoryPanel,
     project::{AgentId, Project},
     project_panel::ProjectPanel,
     settings::{NotifyWhenAgentWaiting, PlaySoundWhenAgentDone, Settings as _},
@@ -187,6 +188,7 @@ fn run_visual_tests(project_path: PathBuf, update_baseline: bool) -> Result<()> 
         title_bar::init(cx);
         project_panel::init(cx);
         outline_panel::init(cx);
+        local_history_ui::init(cx);
         terminal_view::init(cx);
         image_viewer::init(cx);
         search::init(cx);
@@ -535,6 +537,23 @@ fn run_visual_tests(project_path: PathBuf, update_baseline: bool) -> Result<()> 
     }
 
     // Run Test 7: Diff Review Button visual tests
+    println!("\n--- Test 7: local_history_panel (hidden path + shown path) ---");
+    match run_local_history_panel_visual_tests(app_state.clone(), &mut cx, update_baseline) {
+        Ok(TestResult::Passed) => {
+            println!("✓ local_history_panel: PASSED");
+            passed += 1;
+        }
+        Ok(TestResult::BaselineUpdated(_)) => {
+            println!("✓ local_history_panel: Baselines updated");
+            updated += 1;
+        }
+        Err(e) => {
+            eprintln!("✗ local_history_panel: FAILED - {}", e);
+            failed += 1;
+        }
+    }
+
+    // Run Test 8: Diff Review Button visual tests
     println!("\n--- Test 7: diff_review_button (3 variants) ---");
     match run_diff_review_visual_tests(app_state.clone(), &mut cx, update_baseline) {
         Ok(TestResult::Passed) => {
@@ -1002,6 +1021,296 @@ fn init_app_state(cx: &mut App) -> Arc<AppState> {
     });
     AppState::set_global(app_state.clone(), cx);
     app_state
+}
+
+#[cfg(target_os = "macos")]
+fn configure_local_history_visual_settings(
+    history_root: &Path,
+    show_relative_path: bool,
+    cx: &mut App,
+) {
+    let history_root = history_root.to_string_lossy().to_string();
+    cx.update_global::<settings::SettingsStore, _>(|store, cx| {
+        store.update_user_settings(cx, |content| {
+            content.local_history = Some(settings::LocalHistorySettingsContent {
+                enabled: Some(true),
+                capture_on_save: Some(false),
+                capture_on_edit_idle_ms: Some(0.into()),
+                capture_on_focus_change: Some(false),
+                capture_on_window_change: Some(false),
+                capture_on_task: Some(true),
+                capture_on_external_change: Some(false),
+                storage_paths: Some(vec![history_root.clone()]),
+                active_storage_path: Some(history_root.clone()),
+                ..Default::default()
+            });
+
+            let panel = content.local_history_panel.get_or_insert_default();
+            panel.dock = Some(settings::DockPosition::Right);
+            panel.default_width = Some(320.0);
+            panel.show_relative_path = Some(show_relative_path);
+            panel.timeline_gap_min_px = Some(0.0);
+            panel.timeline_gap_max_px = Some(0.0);
+            panel.header_metadata_visibility =
+                Some(settings::LocalHistoryPanelHeaderVisibility::Never);
+        });
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn wait_for_local_history_entries(
+    project: &Entity<project::Project>,
+    project_path: project::ProjectPath,
+    cx: &mut VisualTestAppContext,
+) -> Result<()> {
+    for _ in 0..20 {
+        cx.background_executor.allow_parking();
+        cx.run_until_parked();
+
+        let load_entries = project.read_with(cx, |project, cx| {
+            project
+                .local_history_store()
+                .read(cx)
+                .load_entries_for_path(project_path.clone(), cx)
+        });
+        let entries = cx.foreground_executor.block_test(load_entries)?;
+        cx.background_executor.forbid_parking();
+
+        if !entries.is_empty() {
+            return Ok(());
+        }
+
+        cx.advance_clock(Duration::from_millis(50));
+    }
+
+    anyhow::bail!("local history entries did not appear in time")
+}
+
+#[cfg(target_os = "macos")]
+fn hover_local_history_entry(
+    window: gpui::AnyWindowHandle,
+    cx: &mut VisualTestAppContext,
+) -> Result<()> {
+    cx.simulate_mouse_move(
+        window,
+        point(px(360.0), px(18.0)),
+        None,
+        Modifiers::default(),
+    );
+    cx.update_window(window, |_, window, cx| {
+        window.draw(cx).clear();
+    })?;
+    cx.run_until_parked();
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn run_local_history_panel_visual_tests(
+    app_state: Arc<AppState>,
+    cx: &mut VisualTestAppContext,
+    update_baseline: bool,
+) -> Result<TestResult> {
+    let temp_dir = tempfile::tempdir()?;
+    let temp_path = temp_dir.keep();
+    let canonical_temp = temp_path.canonicalize()?;
+    let project_path = canonical_temp.join("project");
+    let history_root = canonical_temp.join("history");
+    let file_path = project_path.join("src/history_demo.rs");
+    std::fs::create_dir_all(file_path.parent().context("history demo parent missing")?)?;
+    std::fs::create_dir_all(&history_root)?;
+    std::fs::write(
+        &file_path,
+        r#"fn main() {
+    println!("local history visual test");
+}
+"#,
+    )?;
+
+    configure_local_history_visual_settings(&history_root, false, cx);
+
+    let project = cx.update(|cx| {
+        project::Project::local(
+            app_state.client.clone(),
+            app_state.node_runtime.clone(),
+            app_state.user_store.clone(),
+            app_state.languages.clone(),
+            app_state.fs.clone(),
+            None,
+            false,
+            cx,
+        )
+    });
+
+    let window_size = size(px(420.0), px(220.0));
+    let bounds = Bounds {
+        origin: point(px(0.0), px(0.0)),
+        size: window_size,
+    };
+
+    let workspace_window: WindowHandle<Workspace> = cx
+        .update(|cx| {
+            cx.open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    focus: false,
+                    show: false,
+                    ..Default::default()
+                },
+                |window, cx| {
+                    cx.new(|cx| {
+                        Workspace::new(None, project.clone(), app_state.clone(), window, cx)
+                    })
+                },
+            )
+        })
+        .context("Failed to open local history visual test window")?;
+
+    cx.run_until_parked();
+
+    let add_worktree_task = workspace_window
+        .update(cx, |workspace, _window, cx| {
+            let project = workspace.project().clone();
+            project.update(cx, |project, cx| {
+                project.find_or_create_worktree(&project_path, true, cx)
+            })
+        })
+        .context("Failed to start adding local history worktree")?;
+
+    cx.background_executor.allow_parking();
+    let worktree = cx.foreground_executor.block_test(add_worktree_task);
+    cx.background_executor.forbid_parking();
+    worktree.context("Failed to add local history worktree")?;
+
+    cx.run_until_parked();
+
+    let (worktree_id, weak_workspace, async_window_cx) = workspace_window
+        .update(cx, |workspace, window, cx| {
+            let worktree_id = workspace
+                .project()
+                .read(cx)
+                .worktrees(cx)
+                .next()
+                .map(|worktree| worktree.read(cx).id())
+                .context("missing worktree")
+                .unwrap();
+            (worktree_id, workspace.weak_handle(), window.to_async(cx))
+        })
+        .context("Failed to resolve local history workspace context")?;
+
+    let rel_path: Arc<util::rel_path::RelPath> = util::rel_path::rel_path("src/history_demo.rs").into();
+    let local_history_project_path: project::ProjectPath = (worktree_id, rel_path).into();
+
+    let open_file_task = workspace_window
+        .update(cx, |workspace, window, cx| {
+            Some(workspace.open_path(local_history_project_path.clone(), None, true, window, cx))
+        })
+        .ok()
+        .flatten();
+
+    if let Some(task) = open_file_task {
+        cx.background_executor.allow_parking();
+        let _ = cx.foreground_executor.block_test(task);
+        cx.background_executor.forbid_parking();
+    }
+
+    cx.run_until_parked();
+
+    let open_buffer_task =
+        project.update(cx, |project, cx| project.open_local_buffer(&file_path, cx));
+    cx.background_executor.allow_parking();
+    let buffer = cx
+        .foreground_executor
+        .block_test(open_buffer_task)
+        .context("Failed to open local history buffer")?;
+    cx.background_executor.forbid_parking();
+
+    project.update(cx, |project, cx| {
+        project.capture_local_history_for_buffer(
+            buffer,
+            project::LocalHistoryCaptureTrigger::Task,
+            cx,
+        );
+    });
+
+    wait_for_local_history_entries(&project, local_history_project_path.clone(), cx)?;
+
+    cx.background_executor.allow_parking();
+    let panel = cx
+        .foreground_executor
+        .block_test(LocalHistoryPanel::load(weak_workspace, async_window_cx))
+        .context("Failed to load local history panel")?;
+    cx.background_executor.forbid_parking();
+
+    workspace_window
+        .update(cx, |workspace, window, cx| {
+            workspace.add_panel(panel, window, cx);
+            workspace.open_panel::<LocalHistoryPanel>(window, cx);
+        })
+        .ok();
+
+    for _ in 0..5 {
+        cx.background_executor.allow_parking();
+        cx.run_until_parked();
+        cx.background_executor.forbid_parking();
+        cx.advance_clock(Duration::from_millis(50));
+    }
+
+    hover_local_history_entry(workspace_window.into(), cx)?;
+    let hidden_result = run_visual_test(
+        "local_history_panel_hidden_path",
+        workspace_window.into(),
+        cx,
+        update_baseline,
+    )?;
+
+    configure_local_history_visual_settings(&history_root, true, cx);
+
+    for _ in 0..5 {
+        cx.background_executor.allow_parking();
+        cx.run_until_parked();
+        cx.background_executor.forbid_parking();
+        cx.advance_clock(Duration::from_millis(50));
+    }
+
+    hover_local_history_entry(workspace_window.into(), cx)?;
+    let shown_result = run_visual_test(
+        "local_history_panel_show_path",
+        workspace_window.into(),
+        cx,
+        update_baseline,
+    )?;
+
+    workspace_window
+        .update(cx, |workspace, _window, cx| {
+            let project = workspace.project().clone();
+            project.update(cx, |project, cx| {
+                let worktree_ids: Vec<_> =
+                    project.worktrees(cx).map(|wt| wt.read(cx).id()).collect();
+                for id in worktree_ids {
+                    project.remove_worktree(id, cx);
+                }
+            });
+        })
+        .ok();
+
+    cx.run_until_parked();
+
+    let _ = cx.update_window(workspace_window.into(), |_, window, _cx| {
+        window.remove_window();
+    });
+    cx.run_until_parked();
+
+    for _ in 0..15 {
+        cx.advance_clock(Duration::from_millis(100));
+        cx.run_until_parked();
+    }
+
+    match (&hidden_result, &shown_result) {
+        (TestResult::Passed, TestResult::Passed) => Ok(TestResult::Passed),
+        (TestResult::BaselineUpdated(_), _) | (_, TestResult::BaselineUpdated(_)) => Ok(
+            TestResult::BaselineUpdated(get_baseline_path("local_history_panel_hidden_path")),
+        ),
+    }
 }
 
 /// Runs visual tests for breakpoint hover states in the editor gutter.

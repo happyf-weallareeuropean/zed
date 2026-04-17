@@ -45,7 +45,7 @@ pub enum NotificationId {
 
 impl NotificationId {
     /// Returns a unique [`NotificationId`] for the given type.
-    pub const fn unique<T: 'static>() -> Self {
+    pub fn unique<T: 'static>() -> Self {
         Self::Unique(TypeId::of::<T>())
     }
 

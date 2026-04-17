@@ -80,7 +80,7 @@ fn open_copilot_code_verification_window(copilot: &Entity<Copilot>, window: &Win
 }
 
 fn copilot_toast(message: Option<&'static str>, window: &Window, cx: &mut App) {
-    const NOTIFICATION_ID: NotificationId = NotificationId::unique::<CopilotStatusToast>();
+    let notification_id = NotificationId::unique::<CopilotStatusToast>();
 
     let Some(workspace) = Workspace::for_window(window, cx) else {
         return;
@@ -88,8 +88,8 @@ fn copilot_toast(message: Option<&'static str>, window: &Window, cx: &mut App) {
 
     cx.defer(move |cx| {
         workspace.update(cx, |workspace, cx| match message {
-            Some(message) => workspace.show_toast(Toast::new(NOTIFICATION_ID, message), cx),
-            None => workspace.dismiss_toast(&NOTIFICATION_ID, cx),
+            Some(message) => workspace.show_toast(Toast::new(notification_id.clone(), message), cx),
+            None => workspace.dismiss_toast(&notification_id, cx),
         });
     })
 }
