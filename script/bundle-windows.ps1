@@ -39,8 +39,35 @@ function Get-VSArch {
     }
 }
 
+function Get-VsDevShellPath {
+    $vsWhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vsWhere) {
+        $installationPath = & $vsWhere -latest -products * -property installationPath
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($installationPath)) {
+            $candidate = Join-Path $installationPath "Common7\Tools\Launch-VsDevShell.ps1"
+            if (Test-Path $candidate) {
+                return $candidate
+            }
+        }
+    }
+
+    $fallbackPaths = @(
+        "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1",
+        "C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\Launch-VsDevShell.ps1",
+        "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1"
+    )
+
+    foreach ($path in $fallbackPaths) {
+        if (Test-Path $path) {
+            return $path
+        }
+    }
+
+    throw "Unable to locate Launch-VsDevShell.ps1"
+}
+
 Push-Location
-& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1" -Arch (Get-VSArch -Arch $Architecture) -HostArch (Get-VSArch -Arch $OSArchitecture)
+& (Get-VsDevShellPath) -Arch (Get-VSArch -Arch $Architecture) -HostArch (Get-VSArch -Arch $OSArchitecture)
 Pop-Location
 
 $target = "$Architecture-pc-windows-msvc"
