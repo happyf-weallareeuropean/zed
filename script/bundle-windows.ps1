@@ -67,10 +67,7 @@ function CheckEnvironmentVariables {
     }
 
     $requiredVars = @(
-        'ZED_WORKSPACE', 'RELEASE_VERSION', 'ZED_RELEASE_CHANNEL',
-        'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET',
-        'ACCOUNT_NAME', 'CERT_PROFILE_NAME', 'ENDPOINT',
-        'FILE_DIGEST', 'TIMESTAMP_DIGEST', 'TIMESTAMP_SERVER'
+        'ZED_WORKSPACE', 'RELEASE_VERSION', 'ZED_RELEASE_CHANNEL'
     )
 
     foreach ($var in $requiredVars) {
@@ -79,6 +76,23 @@ function CheckEnvironmentVariables {
             exit 1
         }
     }
+}
+
+function Test-TrustedSigningEnvironment {
+    $requiredVars = @(
+        'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET',
+        'ACCOUNT_NAME', 'CERT_PROFILE_NAME', 'ENDPOINT',
+        'FILE_DIGEST', 'TIMESTAMP_DIGEST', 'TIMESTAMP_SERVER'
+    )
+
+    foreach ($var in $requiredVars) {
+        $value = [System.Environment]::GetEnvironmentVariable($var)
+        if ([string]::IsNullOrWhiteSpace($value)) {
+            return $false
+        }
+    }
+
+    return $true
 }
 
 function PrepareForBundle {
@@ -128,9 +142,12 @@ function BuildRemoteServer {
     # Create zipped remote server binary
     $remoteServerSrc = (Resolve-Path ".\$CargoOutDir\remote_server.exe").Path
 
-    if ($env:CI) {
+    if ($env:CI -and (Test-TrustedSigningEnvironment)) {
         Write-Output "Code signing remote_server.exe"
         & "$innoDir\sign.ps1" $remoteServerSrc
+    }
+    elseif ($env:CI) {
+        Write-Output "Trusted Signing configuration is incomplete; skipping remote_server.exe signing."
     }
 
     $remoteServerDst = "$env:ZED_WORKSPACE\target\zed-remote-server-windows-$Architecture.zip"
@@ -159,7 +176,7 @@ function UploadToSentry {
         Write-Output "install with: 'winget install -e --id=Sentry.sentry-cli'"
         return
     }
-    if (-not (Test-Path "env:SENTRY_AUTH_TOKEN")) {
+    if ([string]::IsNullOrWhiteSpace($env:SENTRY_AUTH_TOKEN)) {
         Write-Output "missing SENTRY_AUTH_TOKEN. skipping sentry upload."
         return
     }
@@ -201,6 +218,10 @@ function MakeAppx {
 
 function SignZedAndItsFriends {
     if (-not $env:CI) {
+        return
+    }
+    if (-not (Test-TrustedSigningEnvironment)) {
+        Write-Output "Trusted Signing configuration is incomplete; skipping installer signing."
         return
     }
 
@@ -340,9 +361,12 @@ function BuildInstaller {
     }
 
     $innoArgs = @($issFilePath) + $defs
-    if($env:CI) {
+    if($env:CI -and (Test-TrustedSigningEnvironment)) {
         $signTool = "powershell.exe -ExecutionPolicy Bypass -File $innoDir\sign.ps1 `$f"
         $innoArgs += "/sDefaultsign=`"$signTool`""
+    }
+    elseif($env:CI) {
+        Write-Host "Trusted Signing configuration is incomplete; building an unsigned installer."
     }
 
     # Execute Inno Setup

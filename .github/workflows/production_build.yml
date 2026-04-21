@@ -1,0 +1,301 @@
+name: Production Build
+# Optional repository variables for native arm64 builds:
+# - PROD_LINUX_ARM64_RUNNER
+# - PROD_WINDOWS_ARM64_RUNNER
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: '1'
+
+defaults:
+  run:
+    shell: bash -euxo pipefail {0}
+
+jobs:
+  bundle_linux_x86_64:
+    runs-on: ubuntu-22.04
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          clean: false
+
+      - name: Install Linux dependencies
+        run: ./script/linux
+
+      - name: Download WASI SDK
+        run: ./script/download-wasi-sdk
+
+      - name: Bundle Linux x86_64
+        run: ./script/bundle-linux
+
+      - name: Upload zed-linux-x86_64.tar.gz
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: zed-linux-x86_64.tar.gz
+          path: target/release/zed-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+      - name: Upload zed-remote-server-linux-x86_64.gz
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: zed-remote-server-linux-x86_64.gz
+          path: target/zed-remote-server-linux-x86_64.gz
+          if-no-files-found: error
+
+  bundle_linux_aarch64:
+    if: ${{ vars.PROD_LINUX_ARM64_RUNNER != '' }}
+    runs-on: ${{ vars.PROD_LINUX_ARM64_RUNNER }}
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          clean: false
+
+      - name: Install Linux dependencies
+        run: ./script/linux
+
+      - name: Download WASI SDK
+        run: ./script/download-wasi-sdk
+
+      - name: Bundle Linux aarch64
+        run: ./script/bundle-linux
+
+      - name: Upload zed-linux-aarch64.tar.gz
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: zed-linux-aarch64.tar.gz
+          path: target/release/zed-linux-aarch64.tar.gz
+          if-no-files-found: error
+
+      - name: Upload zed-remote-server-linux-aarch64.gz
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: zed-remote-server-linux-aarch64.gz
+          path: target/zed-remote-server-linux-aarch64.gz
+          if-no-files-found: error
+
+  bundle_mac_aarch64:
+    runs-on: macos-15
+    env:
+      CARGO_INCREMENTAL: 0
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
+      APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
+      APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          clean: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+
+      - name: Clear target directory if large
+        run: ./script/clear-target-dir-if-larger-than 350 200
+
+      - name: Bundle macOS aarch64
+        run: ./script/bundle-mac aarch64-apple-darwin
+
+      - name: Upload Zed-aarch64.dmg
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: Zed-aarch64.dmg
+          path: target/aarch64-apple-darwin/release/Zed-aarch64.dmg
+          if-no-files-found: error
+
+      - name: Upload zed-remote-server-macos-aarch64.gz
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: zed-remote-server-macos-aarch64.gz
+          path: target/zed-remote-server-macos-aarch64.gz
+          if-no-files-found: error
+
+  bundle_mac_x86_64:
+    runs-on: macos-15-intel
+    env:
+      CARGO_INCREMENTAL: 0
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
+      APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
+      APPLE_NOTARIZATION_ISSUER_ID: ${{ secrets.APPLE_NOTARIZATION_ISSUER_ID }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          clean: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+
+      - name: Clear target directory if large
+        run: ./script/clear-target-dir-if-larger-than 350 200
+
+      - name: Bundle macOS x86_64
+        run: ./script/bundle-mac x86_64-apple-darwin
+
+      - name: Upload Zed-x86_64.dmg
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: Zed-x86_64.dmg
+          path: target/x86_64-apple-darwin/release/Zed-x86_64.dmg
+          if-no-files-found: error
+
+      - name: Upload zed-remote-server-macos-x86_64.gz
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: zed-remote-server-macos-x86_64.gz
+          path: target/zed-remote-server-macos-x86_64.gz
+          if-no-files-found: error
+
+  bundle_windows_x86_64:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CARGO_INCREMENTAL: 0
+      AZURE_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
+      ACCOUNT_NAME: ${{ vars.AZURE_SIGNING_ACCOUNT_NAME }}
+      CERT_PROFILE_NAME: ${{ vars.AZURE_SIGNING_CERT_PROFILE_NAME }}
+      ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+      FILE_DIGEST: SHA256
+      TIMESTAMP_DIGEST: SHA256
+      TIMESTAMP_SERVER: http://timestamp.acs.microsoft.com
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          clean: false
+
+      - name: Bundle Windows x86_64
+        run: script/bundle-windows.ps1 -Architecture x86_64
+
+      - name: Upload Zed-x86_64.exe
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: Zed-x86_64.exe
+          path: target/Zed-x86_64.exe
+          if-no-files-found: error
+
+      - name: Upload zed-remote-server-windows-x86_64.zip
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: zed-remote-server-windows-x86_64.zip
+          path: target/zed-remote-server-windows-x86_64.zip
+          if-no-files-found: error
+
+  bundle_windows_aarch64:
+    if: ${{ vars.PROD_WINDOWS_ARM64_RUNNER != '' }}
+    runs-on: ${{ vars.PROD_WINDOWS_ARM64_RUNNER }}
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CARGO_INCREMENTAL: 0
+      AZURE_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
+      ACCOUNT_NAME: ${{ vars.AZURE_SIGNING_ACCOUNT_NAME }}
+      CERT_PROFILE_NAME: ${{ vars.AZURE_SIGNING_CERT_PROFILE_NAME }}
+      ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+      FILE_DIGEST: SHA256
+      TIMESTAMP_DIGEST: SHA256
+      TIMESTAMP_SERVER: http://timestamp.acs.microsoft.com
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          clean: false
+
+      - name: Bundle Windows aarch64
+        run: script/bundle-windows.ps1 -Architecture aarch64
+
+      - name: Upload Zed-aarch64.exe
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: Zed-aarch64.exe
+          path: target/Zed-aarch64.exe
+          if-no-files-found: error
+
+      - name: Upload zed-remote-server-windows-aarch64.zip
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: zed-remote-server-windows-aarch64.zip
+          path: target/zed-remote-server-windows-aarch64.zip
+          if-no-files-found: error
+
+  publish_release:
+    if: >-
+      ${{
+        always() &&
+        startsWith(github.ref, 'refs/tags/v') &&
+        needs.bundle_linux_x86_64.result == 'success' &&
+        needs.bundle_mac_aarch64.result == 'success' &&
+        needs.bundle_mac_x86_64.result == 'success' &&
+        needs.bundle_windows_x86_64.result == 'success' &&
+        (needs.bundle_linux_aarch64.result == 'success' || needs.bundle_linux_aarch64.result == 'skipped') &&
+        (needs.bundle_windows_aarch64.result == 'success' || needs.bundle_windows_aarch64.result == 'skipped')
+      }}
+    needs:
+      - bundle_linux_x86_64
+      - bundle_linux_aarch64
+      - bundle_mac_aarch64
+      - bundle_mac_x86_64
+      - bundle_windows_x86_64
+      - bundle_windows_aarch64
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download workflow artifacts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v5
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Show release artifacts
+        run: ls -lR release-artifacts
+
+      - name: Publish GitHub release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" release-artifacts/* --clobber
+          else
+            gh release create "$tag" release-artifacts/* --title "$tag" --generate-notes
+          fi
