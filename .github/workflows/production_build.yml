@@ -183,6 +183,7 @@ jobs:
         shell: pwsh
     env:
       CARGO_INCREMENTAL: 0
+      CARGO_HOME: D:\c
       AZURE_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}
@@ -224,6 +225,7 @@ jobs:
         shell: pwsh
     env:
       CARGO_INCREMENTAL: 0
+      CARGO_HOME: D:\c
       AZURE_TENANT_ID: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_SIGNING_CLIENT_SECRET }}

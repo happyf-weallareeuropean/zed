@@ -199,7 +199,7 @@ impl LineWrapper {
             let result = match truncate_from {
                 TruncateFrom::Start => SharedString::from(format!(
                     "{truncation_affix}{}",
-                    &line[line.ceil_char_boundary(truncate_ix + 1)..]
+                    &line[next_char_boundary(&line, truncate_ix)..]
                 )),
                 TruncateFrom::End => {
                     SharedString::from(format!("{}{truncation_affix}", &line[..truncate_ix]))
@@ -269,6 +269,14 @@ impl LineWrapper {
             width
         }
     }
+}
+
+fn next_char_boundary(text: &str, boundary: usize) -> usize {
+    text[boundary..]
+        .chars()
+        .next()
+        .map(|character| boundary + character.len_utf8())
+        .unwrap_or(text.len())
 }
 
 fn update_runs_after_truncation(
