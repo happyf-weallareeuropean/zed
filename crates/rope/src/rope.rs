@@ -1,5 +1,3 @@
-#![feature(round_char_boundary)]
-
 mod chunk;
 mod offset_utf16;
 mod point;

@@ -1,6 +1,6 @@
 use anyhow::{Context as _, Result};
 use buffer_diff::BufferDiff;
-use db::kvp::KEY_VALUE_STORE;
+use db::kvp::GlobalKeyValueStore;
 use editor::{Editor, EditorEvent, MultiBuffer, RenderDiffHunkControlsFn, ToPoint};
 use gpui::{
     Action, AnyElement, App, AppContext as _, AsyncWindowContext, ClickEvent, Context, Corner,
@@ -33,7 +33,7 @@ use util::{ResultExt, TryFutureExt};
 use workspace::{
     Item, ItemHandle as _, ItemNavHistory, Toast, Workspace,
     dock::{DockPosition, Panel, PanelEvent},
-    item::{BreadcrumbText, ItemEvent, SaveOptions, TabContentParams},
+    item::{HighlightedText, ItemEvent, SaveOptions, TabContentParams},
     notifications::NotificationId,
     searchable::SearchableItemHandle,
 };
@@ -284,7 +284,9 @@ impl LocalHistoryPanel {
     ) -> Task<Result<Entity<Self>>> {
         cx.spawn(async move |cx| {
             let serialized_panel = cx
-                .background_spawn(async move { KEY_VALUE_STORE.read_kvp(LOCAL_HISTORY_PANEL_KEY) })
+                .background_spawn(async move {
+                    GlobalKeyValueStore::global().read_kvp(LOCAL_HISTORY_PANEL_KEY)
+                })
                 .await
                 .log_err()
                 .flatten()
@@ -388,7 +390,7 @@ impl LocalHistoryPanel {
         let active = self.active;
         self.pending_serialization = cx.background_spawn(
             async move {
-                KEY_VALUE_STORE
+                GlobalKeyValueStore::global()
                     .write_kvp(
                         LOCAL_HISTORY_PANEL_KEY.into(),
                         serde_json::to_string(&SerializedLocalHistoryPanel {
@@ -1313,15 +1315,9 @@ impl Panel for LocalHistoryPanel {
         });
     }
 
-    fn size(&self, _: &Window, cx: &App) -> Pixels {
+    fn default_size(&self, _: &Window, cx: &App) -> Pixels {
         self.width
             .unwrap_or_else(|| LocalHistoryPanelSettings::get_global(cx).default_width)
-    }
-
-    fn set_size(&mut self, size: Option<Pixels>, _: &mut Window, cx: &mut Context<Self>) {
-        self.width = size;
-        self.serialize(cx);
-        cx.notify();
     }
 
     fn set_active(&mut self, active: bool, _: &mut Window, cx: &mut Context<Self>) {
@@ -1644,7 +1640,7 @@ impl Item for LocalHistoryDiffView {
         Some(format!("{path} • {time}").into())
     }
 
-    fn to_item_events(event: &EditorEvent, f: impl FnMut(ItemEvent)) {
+    fn to_item_events(event: &EditorEvent, f: &mut dyn FnMut(ItemEvent)) {
         Editor::to_item_events(event, f)
     }
 
@@ -1712,8 +1708,8 @@ impl Item for LocalHistoryDiffView {
         workspace::ToolbarItemLocation::PrimaryLeft
     }
 
-    fn breadcrumbs(&self, theme: &theme::Theme, cx: &App) -> Option<Vec<BreadcrumbText>> {
-        self.editor.breadcrumbs(theme, cx)
+    fn breadcrumbs(&self, cx: &App) -> Option<(Vec<HighlightedText>, Option<gpui::Font>)> {
+        self.editor.breadcrumbs(cx)
     }
 
     fn added_to_workspace(
@@ -1761,7 +1757,7 @@ fn current_project_path(workspace: &Workspace, cx: &App) -> Option<ProjectPath> 
     let active_editor = active_item
         .act_as::<Editor>(cx)
         .filter(|editor| editor.read(cx).mode().is_full())?;
-    let (_, buffer, _) = active_editor.read(cx).active_excerpt(cx)?;
+    let buffer = active_editor.read(cx).active_buffer(cx)?;
     let file = buffer.read(cx).file()?.clone();
     let project_path = ProjectPath::from_file(file.as_ref(), cx);
     Some(project_path)

@@ -398,6 +398,14 @@ pub struct TitleBarSettingsContent {
     ///
     /// Default: false
     pub show_menus: Option<bool>,
+    /// The layout of window control buttons in the title bar (Linux only).
+    ///
+    /// This can be set to "platform_default" to follow the system configuration, or
+    /// "standard" to use Zed's built-in layout. For custom layouts, use a
+    /// GNOME-style layout string like "close:minimize,maximize".
+    ///
+    /// Default: "platform_default"
+    pub button_layout: Option<WindowButtonLayoutContent>,
 }
 /// Configuration of audio in Zed.
 #[with_fallible_options]
