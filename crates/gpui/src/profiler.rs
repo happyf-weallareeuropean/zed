@@ -70,8 +70,8 @@ pub struct SerializedLocation {
     pub column: u32,
 }
 
-impl From<&core::panic::Location<'static>> for SerializedLocation {
-    fn from(value: &core::panic::Location<'static>) -> Self {
+impl From<&'static core::panic::Location<'static>> for SerializedLocation {
+    fn from(value: &'static core::panic::Location<'static>) -> Self {
         SerializedLocation {
             file: value.file().into(),
             line: value.line(),
