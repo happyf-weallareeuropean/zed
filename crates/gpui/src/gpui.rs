@@ -1,3 +1,4 @@
+#![feature(round_char_boundary)]
 #![doc = include_str!("../README.md")]
 #![warn(missing_docs)]
 #![allow(clippy::type_complexity)] // Not useful, GPUI makes heavy use of callbacks
